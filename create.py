@@ -91,4 +91,4 @@ def main(pageToken=''):
 
   main(data['nextPageToken']) if data.get('nextPageToken') else print(fails)
 
-main("EAAaB1BUOkNQOEI")
+main()
