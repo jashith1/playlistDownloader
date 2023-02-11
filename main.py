@@ -1,6 +1,7 @@
 import requests
 import os
 from bs4 import BeautifulSoup
+from tqdm import tqdm
 # import typer;
 import key;
 apiKey=key.apiKey
@@ -11,22 +12,22 @@ pDownloadLink = "https://10downloader.com/download?v="
 #yt link
 ytLink="youtube.com/watch?v="
 
-#path to paste
-path="videos/"
-
-
 playlistId="PL278kIbxfIKdYE4kM_xlWt3GOwktUs_OJ"
 # playlistId="PL278kIbxfIKeL7AvJIUlfav2TC_VradYu"
 
 apiUrl = "https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&part=status&key="+apiKey+"&playlistId="+playlistId+"&pageToken="
 
+#path to paste
+path=requests.get(apiUrl.replace("playlistId", "id").replace("playlistItems", "playlists")).json()['items'][0]["snippet"]["title"]+"/"
+if not os.path.isdir(path): 
+  os.mkdir(path)
 
-#testing
+# testing
 # import shutil 
 # shutil.rmtree(path)
 # os.mkdir(path)
 # print("starting")
-#end testing
+# end testing
 
 def handleResponse(response):
   if response['status'] == 200: return response
@@ -83,9 +84,12 @@ def downloadVideo(video):
 
   #download video
   if not downloadUrl: return handleResponse({"name": name, "id": id, "status": 500, "description": "couldn't get download link"})
-  download = requests.get(downloadUrl)
-  open(path+name+"/video.mp4", "wb").write(download.content)
-  print("done")
+  download = requests.get(downloadUrl, stream=True)
+  size = int(download.headers.get("Content-Length", 0))
+  with tqdm.wrapattr(open(path+name+"/video.mp4", "wb"), "write", miniters=1, total=size) as file:
+    for chunk in download.iter_content(chunk_size=4096):
+      file.write(chunk)
+
   return handleResponse({"name": name, "id": id, "status": 200, "description": "download completed in "+path+"/"+name})
 
 def playlistIterate(task, fails=[], pageToken=''):
@@ -97,7 +101,7 @@ def playlistIterate(task, fails=[], pageToken=''):
       if(response["status"] != 200): fails.append(response)
     else: handleResponse({"name": "Private Video", "id": video['snippet']['resourceId']['videoId'], "status": 400, "description": "private video"})
 
-  playlistIterate(task, fails, data['nextPageToken'])  if data.get('nextPageToken') else print(fails)
+  playlistIterate(task, fails, data['nextPageToken'])  if data.get('nextPageToken') else (print(fails) if len(fails) > 0 else print("no errors"))
 
 def updateVideos(video):
   name = getVideoDetails(video)[0]
